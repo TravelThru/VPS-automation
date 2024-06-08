@@ -322,6 +322,8 @@ def calculate_error_percentage(row):
 # Áp dụng hàm tính toán cho DataFrame
 df['Error Percentage'] = df.apply(calculate_error_percentage, axis=1)
 
+df.to_excel("testVPS.xlsx")
+
 #Overwrite lên file Driver Performance by ID New (SharePoint)
 import requests
 
@@ -335,7 +337,7 @@ drive_id = 'b!aUDd-y3hMEqzFpJs69SXLqsFboc6d3VHuXjQmhhH2yyWDIb9eEGSTJmyXz-tN3EO'
 append_url = f'https://graph.microsoft.com/v1.0/sites/fbdd4069-e12d-4a30-b316-926cebd4972e/lists/fd860c96-4178-4c92-99b2-5f3fad37710e/items/15/driveitem/workbook/worksheets/Sheet1/tables/Table1/rows/add'
 
 # Endpoint để overwrite file
-update_url = f"https://graph.microsoft.com/v1.0/sites/fbdd4069-e12d-4a30-b316-926cebd4972e/drives/b!aUDd-y3hMEqzFpJs69SXLqsFboc6d3VHuXjQmhhH2yyWDIb9eEGSTJmyXz-tN3EO/root:/test.xlsx:/content"
+update_url = f"https://graph.microsoft.com/v1.0/sites/fbdd4069-e12d-4a30-b316-926cebd4972e/drives/b!aUDd-y3hMEqzFpJs69SXLqsFboc6d3VHuXjQmhhH2yyWDIb9eEGSTJmyXz-tN3EO/root:/testVPS.xlsx:/content"
 
 # Access token
 token_url = f'https://login.microsoftonline.com/a3f88450-77ef-4df3-89ea-c69cbc9bc410/oauth2/v2.0/token'
@@ -357,7 +359,7 @@ headers = {
 
 # Đọc dữ liệu file và gửi lên SharePoint
 # Thay đổi, cung  cấp dường dẫn của file đã lưu để mở file
-with open('test.xlsx', 'rb') as file:
+with open('testVPS.xlsx', 'rb') as file:
     file_content = file.read()
     response = requests.put(update_url, headers=headers, data=file_content)
 
