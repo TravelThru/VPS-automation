@@ -101,19 +101,19 @@ if __name__ == "__main__":
     token = getToken(email, password)
     print(f"Token: {token}")
 
-
+###########################################################################################################################################################################
 # API request to fetch ride data
 url = "https://portal.taxi.booking.com/api/reports/rides"
 base_url = "https://portal.taxi.booking.com/api/reports/rides"
 params = {
     "pageSize": "500",
-    "dateFrom": "2024-04-01T00:00:00",
-    "dateTo": "2024-04-01T23:59:59",
+    "dateFrom": "2024-06-01T00:00:00",
+    "dateTo": "2024-07-31T23:59:59",
     "supplierLocationIds": "",
     "hasRideRating": "false",
     "hasIncident": "false"
 }
-
+###########################################################################################################################################################################
 # Headers
 headers = {
     "Authorization": token
@@ -322,7 +322,7 @@ def calculate_error_percentage(row):
 # Áp dụng hàm tính toán cho DataFrame
 df['Error Percentage'] = df.apply(calculate_error_percentage, axis=1)
 
-df.to_excel("testVPS.xlsx")
+df.to_excel("Driver Performance VPS automation.xlsx")
 
 #Overwrite lên file Driver Performance by ID New (SharePoint)
 import requests
@@ -336,8 +336,12 @@ drive_id = 'b!aUDd-y3hMEqzFpJs69SXLqsFboc6d3VHuXjQmhhH2yyWDIb9eEGSTJmyXz-tN3EO'
 
 append_url = f'https://graph.microsoft.com/v1.0/sites/fbdd4069-e12d-4a30-b316-926cebd4972e/lists/fd860c96-4178-4c92-99b2-5f3fad37710e/items/15/driveitem/workbook/worksheets/Sheet1/tables/Table1/rows/add'
 
+###########################################################################################################################################################################
+
 # Endpoint để overwrite file
-update_url = f"https://graph.microsoft.com/v1.0/sites/fbdd4069-e12d-4a30-b316-926cebd4972e/drives/b!aUDd-y3hMEqzFpJs69SXLqsFboc6d3VHuXjQmhhH2yyWDIb9eEGSTJmyXz-tN3EO/root:/testVPS.xlsx:/content"
+update_url = f"https://graph.microsoft.com/v1.0/sites/fbdd4069-e12d-4a30-b316-926cebd4972e/drives/b!aUDd-y3hMEqzFpJs69SXLqsFboc6d3VHuXjQmhhH2yyWDIb9eEGSTJmyXz-tN3EO/root:/Driver Performance VPS automation.xlsx:/content"
+
+###########################################################################################################################################################################
 
 # Access token
 token_url = f'https://login.microsoftonline.com/a3f88450-77ef-4df3-89ea-c69cbc9bc410/oauth2/v2.0/token'
@@ -356,10 +360,10 @@ headers = {
     'Authorization': 'Bearer ' + access_token,
     'Content-Type': 'application/x-www-form-urlencoded',
 }
-
+###########################################################################################################################################################################
 # Đọc dữ liệu file và gửi lên SharePoint
 # Thay đổi, cung  cấp dường dẫn của file đã lưu để mở file
-with open('testVPS.xlsx', 'rb') as file:
+with open('Driver Performance VPS automation.xlsx', 'rb') as file:
     file_content = file.read()
     response = requests.put(update_url, headers=headers, data=file_content)
 
