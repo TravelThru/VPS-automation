@@ -1,7 +1,4 @@
-import requests
-import pandas as pd
-import time
-import psutil
+# Import necessary modules
 from seleniumwire import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -9,8 +6,8 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
-
-pd.set_option('display.max_columns', None)
+import psutil
+import time
 
 def getToken(email, password):
     # Set up Chrome options
@@ -24,8 +21,10 @@ def getToken(email, password):
     chrome_options.add_argument("--proxy-server='direct://'")
     chrome_options.add_argument("--proxy-bypass-list=*")
     chrome_options.add_argument("--start-maximized")
+    chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--ignore-certificate-errors")
     chrome_options.add_argument("--allow-running-insecure-content")
+    chrome_options.add_argument("--disable-extensions")
     chrome_options.add_argument("--disable-popup-blocking")
     chrome_options.add_argument("--disable-infobars")
 
@@ -43,9 +42,12 @@ def getToken(email, password):
         )
         print("Email input found")
 
+        # Find the email and password input fields
+        email_input = driver.find_element(By.CSS_SELECTOR, "input[type='email'][name='email']")
+        password_input = driver.find_element(By.CSS_SELECTOR, "input[type='password'][name='password']")
+
         # Fill in the login details
         email_input.send_keys(email)
-        password_input = driver.find_element(By.CSS_SELECTOR, "input[type='password'][name='password']")
         password_input.send_keys(password)
         print("Filled in login details")
 
@@ -100,41 +102,93 @@ if __name__ == "__main__":
     password = "Tmai091092@@"
     token = getToken(email, password)
     print(f"Token: {token}")
+    
+    
+# ============================================================================================================================================================================
+import requests
+import pandas as pd
+pd.set_option('display.max_columns', None)
 
-###########################################################################################################################################################################
-# API request to fetch ride data
-url = "https://portal.taxi.booking.com/api/reports/rides"
-base_url = "https://portal.taxi.booking.com/api/reports/rides"
-params = {
-    "pageSize": "500",
-    "dateFrom": "2024-06-01T00:00:00",
-    "dateTo": "2024-07-31T23:59:59",
-    "supplierLocationIds": "",
-    "hasRideRating": "false",
-    "hasIncident": "false"
-}
-###########################################################################################################################################################################
-# Headers
-headers = {
-    "Authorization": token
-}
-combined_data = []
+# URLs and token
+base_url = "https://portal.taxi.booking.com/api/"
+token = token  # Your authorization token
 
-num_pages = 500
-for page in range(1, num_pages + 1):
-    params["pageNumber"] = str(page)
-    response = requests.get(base_url, headers=headers, params=params)
-    if response.status_code == 200:
-        data = response.json()
-        if 'results' in data and data['results']:
-            combined_data.extend(data['results'])
+# Function to make requests
+def get_request(url, headers=None, params=None):
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()  # Raise an exception for 4xx or 5xx status codes
+        return response.json()  # Return JSON content if the request was successful
+    except requests.exceptions.RequestException as e:
+        print(f"Request failed: {e}")
+        return None
+
+# Fetch preferred status data
+def fetch_preferred_status(start_date, end_date):
+    preferred_status_url = base_url + "supplier/performance"
+    headers = {"Authorization": token}
+    params = {"startDate": start_date, "endDate": end_date}
+    response_data = get_request(preferred_status_url, headers=headers, params=params)
+    if response_data:
+        print("Preferred status data fetched successfully.")
+        return response_data
+    else:
+        print("Failed to fetch preferred status data.")
+        return None
+
+# Fetch ride data
+def fetch_ride_data(date_from, date_to, page_size=500, max_pages=500):
+    url = base_url + "reports/rides"
+    headers = {"Authorization": token}
+    params = {
+        "pageSize": str(page_size),
+        "dateFrom": date_from,
+        "dateTo": date_to,
+        "supplierLocationIds": "",
+        "hasRideRating": "false",
+        "hasIncident": "false"
+    }
+    combined_data = []
+    for page in range(1, max_pages + 1):
+        params["pageNumber"] = str(page)
+        response_data = get_request(url, headers=headers, params=params)
+        if response_data and 'results' in response_data and response_data['results']:
+            combined_data.extend(response_data['results'])
         else:
             print(f"No data found on page {page}. Exiting loop.")
             break
-    else:
-        print(f"Failed to fetch data from page {page}. Status code:", response.status_code)
-        break
+    print("Total number of records:", len(combined_data))
+    return combined_data
 
+# Fetch location data (bookingv2)
+def fetch_location_data(pickup_date_from, pickup_date_to):
+    location_url = base_url + f"bookings/v2?meta=true&pickUpDateFrom={pickup_date_from}&pickUpDateTo={pickup_date_to}"
+    headers = {"Authorization": token}
+    response_data = get_request(location_url, headers=headers)
+    if response_data:
+        print("Location data fetched successfully.")
+        return response_data
+    else:
+        print("Failed to fetch location data.")
+        return None
+
+# Parameters
+start_date = "2024-06-01"
+end_date = "2024-06-31"
+date_from = "2024-06-01T00:00:00"
+date_to = "2024-06-01T23:59:59"
+pickup_date_from = "2024-06-09T17:00"
+pickup_date_to = "2024-06-10T16:59"
+
+# Fetch data
+preferred_status = fetch_preferred_status(start_date, end_date)
+ride_data = fetch_ride_data(date_from, date_to)
+#location_data_bookingv2 = fetch_location_data(pickup_date_from, pickup_date_to)
+
+# ============================================================================================================================================================================
+import pandas as pd
+
+# Hàm xử lý sự kiện driver
 def process_driver_events(driver_events):
     departed_to_pickup = None
     arrived_at_pickup = None
@@ -195,10 +249,9 @@ def process_driver_events(driver_events):
         error_departed_to_pickup, error_arrived_at_pickup,
         error_departed_to_dropoff, error_arrived_at_dropoff
     )
-
-
+# ============================================================================================================================================================================
 # Trích xuất thông tin cần thiết từ dữ liệu JSON
-bookings = combined_data
+bookings = ride_data
 booking_info_list = []
 
 for booking in bookings:
@@ -249,51 +302,53 @@ for booking in bookings:
     
     booking_info = {
         "Booking ID": booking_id,
-        "Supplier Location Name": supplierLocationName,
-        "Ride Status": rideStatus,
-        "Incident Status": incidentStatus,
-        "Incident Type": incidentType,
-        "Pickup Date Time UTC": pickupDateTimeUTC,
-        "Pickup Date Time Local": pickupDateTimeLocal,
+        "supplierLocationName":supplierLocationName,
+        "rideStatus": rideStatus,
+        "incidentStatus": incidentStatus,
+        "incidentType": incidentType,
+        "pickup Date Time UTC": pickupDateTimeUTC,
+        "pickupDateTimeLocal": pickupDateTimeLocal,
         "Driver's Name": driver_name,
-        "Driver Events Status": fixed_status,
-        "Price": fixed_price,
-        "Currency": currency,
-        "Driving Distance (km)": drivingDistanceInKm,
-        "Pickup Location": pickupLocation,
-        "Dropoff Location": dropoffLocation,
-        "Timezone": timezone,
-        "Rides Review": ridesReview,
-        "Comments": comments,
-        "Ride Score": rideScore,
-        "Driver Departed to Pickup": departed_to_pickup,
-        "Driver Arrived at Pickup": arrived_at_pickup,
-        "Driver Departed to Dropoff": departed_to_dropoff,
-        "Driver Arrived at Dropoff": arrived_at_dropoff,
-        "Latitude Departed to Pickup": latitude_departed_to_pickup,
-        "Longitude Departed to Pickup": longitude_departed_to_pickup,
-        "Latitude Arrived at Pickup": latitude_arrived_at_pickup,
-        "Longitude Arrived at Pickup": longitude_arrived_at_pickup,
-        "Latitude Departed to Dropoff": latitude_departed_to_dropoff,
-        "Longitude Departed to Dropoff": longitude_departed_to_dropoff,
-        "Latitude Arrived at Dropoff": latitude_arrived_at_dropoff,
-        "Longitude Arrived at Dropoff": longitude_arrived_at_dropoff,
-        "Error Departed to Pickup": error_departed_to_pickup,
-        "Error Arrived at Pickup": error_arrived_at_pickup,
-        "Error Departed to Dropoff": error_departed_to_dropoff,
-        "Error Arrived at Dropoff": error_arrived_at_dropoff
+        "driverEventsStatus": fixed_status,
+        "price": fixed_price,
+        "currency": currency,
+        "drivingDistanceInKm": drivingDistanceInKm,
+        "pickupLocation": pickupLocation,
+        "dropoffLocation": dropoffLocation,
+        "timezone": timezone,
+        "ridesReview": ridesReview,
+        "comments": comments,
+        "rideScore": rideScore,
+        "DRIVER_DEPARTED_TO_PICKUP": departed_to_pickup,
+        "DRIVER_ARRIVED_AT_PICKUP": arrived_at_pickup,
+        "DRIVER_DEPARTED_TO_DROPOFF": departed_to_dropoff,
+        "DRIVER_ARRIVED_AT_DROPOFF": arrived_at_dropoff,
+        "latitude_departed_to_pickup": latitude_departed_to_pickup,
+        "longitude_departed_to_pickup": longitude_departed_to_pickup,
+        "latitude_arrived_at_pickup": latitude_arrived_at_pickup,
+        "longitude_arrived_at_pickup": longitude_arrived_at_pickup,
+        "latitude_departed_to_dropoff": latitude_departed_to_dropoff,
+        "longitude_departed_to_dropoff": longitude_departed_to_dropoff,
+        "latitude_arrived_at_dropoff": latitude_arrived_at_dropoff,
+        "longitude_arrived_at_dropoff": longitude_arrived_at_dropoff,
+        "error_departed_to_pickup": error_departed_to_pickup,
+        "error_arrived_at_pickup": error_arrived_at_pickup,
+        "error_departed_to_dropoff": error_departed_to_dropoff,
+        "error_arrived_at_dropoff": error_arrived_at_dropoff
     }
     booking_info_list.append(booking_info)
 
 # Tạo DataFrame từ danh sách thông tin booking
 df = pd.DataFrame(booking_info_list)
+# ============================================================================================================================================================================
+
 
 # Tính toán cột Count dựa trên giá trị của các cột error
 def calculate_error_percentage(row):
-    error_departed_to_pickup = row['Error Departed to Pickup']
-    error_arrived_at_pickup = row['Error Arrived at Pickup']
-    error_departed_to_dropoff = row['Error Departed to Dropoff']
-    error_arrived_at_dropoff = row['Error Arrived at Dropoff']
+    error_departed_to_pickup = row['error_departed_to_pickup']
+    error_arrived_at_pickup = row['error_arrived_at_pickup']
+    error_departed_to_dropoff = row['error_departed_to_dropoff']
+    error_arrived_at_dropoff = row['error_arrived_at_dropoff']
 
     error_count = 0
     
@@ -322,9 +377,50 @@ def calculate_error_percentage(row):
 # Áp dụng hàm tính toán cho DataFrame
 df['Error Percentage'] = df.apply(calculate_error_percentage, axis=1)
 
-df.to_excel("Driver Performance VPS automation.xlsx")
+# ============================================================================================================================================================================
+Dim_driver_event = df[['Booking ID', 
+                       'DRIVER_DEPARTED_TO_PICKUP',
+                       'latitude_departed_to_pickup',
+                       'longitude_departed_to_pickup',
+                       'DRIVER_ARRIVED_AT_PICKUP',
+                       'latitude_arrived_at_pickup',
+                       'longitude_arrived_at_pickup',
+                       'DRIVER_DEPARTED_TO_DROPOFF',
+                       'latitude_departed_to_dropoff',
+                       'longitude_departed_to_dropoff',
+                       'DRIVER_ARRIVED_AT_DROPOFF', 
+                       'latitude_arrived_at_dropoff',
+                       'longitude_arrived_at_dropoff',
+                       'error_departed_to_pickup',
+                       'error_arrived_at_pickup',
+                       'error_departed_to_dropoff',
+                       'error_arrived_at_dropoff',
+                       'Error Percentage' 
+                       ]]
+df_driver_performance_by_ID = df.drop(['latitude_departed_to_pickup',
+         'longitude_departed_to_pickup',
+         'latitude_arrived_at_pickup',
+         'longitude_arrived_at_pickup',
+         'latitude_departed_to_dropoff',
+         'longitude_departed_to_dropoff',
+         'latitude_arrived_at_dropoff',
+         'longitude_arrived_at_dropoff',
+         'error_departed_to_pickup',
+         'error_arrived_at_pickup',
+         'error_departed_to_dropoff',
+         'error_arrived_at_dropoff',
+         'Error Percentage' ],axis=1)
+# Export to excel Dim_driver_event  
 
-#Overwrite lên file Driver Performance by ID New (SharePoint)
+Dim_driver_event.to_excel("Dim Driver Event Daily.xlsx", index = False)
+df_driver_performance_by_ID.to_excel("Driver Performance VPS automation.xlsx", index = False)
+
+# ============================================================================================================================================================================
+
+# ============================================================================================================================================================================
+
+# ============================================================================================================================================================================
+#Overwrite lên file Dim Driver Event Daily (SharePoint)
 import requests
 
 # Các thông tin cần thiết
@@ -336,12 +432,8 @@ drive_id = 'b!aUDd-y3hMEqzFpJs69SXLqsFboc6d3VHuXjQmhhH2yyWDIb9eEGSTJmyXz-tN3EO'
 
 append_url = f'https://graph.microsoft.com/v1.0/sites/fbdd4069-e12d-4a30-b316-926cebd4972e/lists/fd860c96-4178-4c92-99b2-5f3fad37710e/items/15/driveitem/workbook/worksheets/Sheet1/tables/Table1/rows/add'
 
-###########################################################################################################################################################################
-
 # Endpoint để overwrite file
 update_url = f"https://graph.microsoft.com/v1.0/sites/fbdd4069-e12d-4a30-b316-926cebd4972e/drives/b!aUDd-y3hMEqzFpJs69SXLqsFboc6d3VHuXjQmhhH2yyWDIb9eEGSTJmyXz-tN3EO/root:/Driver Performance VPS automation.xlsx:/content"
-
-###########################################################################################################################################################################
 
 # Access token
 token_url = f'https://login.microsoftonline.com/a3f88450-77ef-4df3-89ea-c69cbc9bc410/oauth2/v2.0/token'
@@ -360,7 +452,7 @@ headers = {
     'Authorization': 'Bearer ' + access_token,
     'Content-Type': 'application/x-www-form-urlencoded',
 }
-###########################################################################################################################################################################
+
 # Đọc dữ liệu file và gửi lên SharePoint
 # Thay đổi, cung  cấp dường dẫn của file đã lưu để mở file
 with open('Driver Performance VPS automation.xlsx', 'rb') as file:
@@ -368,6 +460,298 @@ with open('Driver Performance VPS automation.xlsx', 'rb') as file:
     response = requests.put(update_url, headers=headers, data=file_content)
 
 if response.status_code == 200:
-    print("ghi đè thông tin thành công!")
+    print("ghi đè thông tin Dim Driver Event Daily thành công!")
 else:
     print("Có lỗi xảy ra khi ghi đè thông tin.")
+    
+# ============================================================================================================================================================================
+
+# ============================================================================================================================================================================
+
+# ============================================================================================================================================================================
+
+#Overwrite lên file Dim Driver Event Daily (SharePoint)
+import requests
+
+# Các thông tin cần thiết
+tenant_id = 'a3f88450-77ef-4df3-89ea-c69cbc9bc410'
+client_id = 'ad6b066a-d749-4f0b-bfbb-bad8de0af5d1'
+client_secret = 'YwZ8Q~N6dAwc~sTcMAQsDQXwCKDfPBk81miLVbL4'
+site_id = 'fbdd4069-e12d-4a30-b316-926cebd4972e'
+drive_id = 'b!aUDd-y3hMEqzFpJs69SXLqsFboc6d3VHuXjQmhhH2yyWDIb9eEGSTJmyXz-tN3EO'
+
+append_url = f'https://graph.microsoft.com/v1.0/sites/fbdd4069-e12d-4a30-b316-926cebd4972e/lists/fd860c96-4178-4c92-99b2-5f3fad37710e/items/15/driveitem/workbook/worksheets/Sheet1/tables/Table1/rows/add'
+
+# Endpoint để overwrite file
+update_url = f"https://graph.microsoft.com/v1.0/sites/fbdd4069-e12d-4a30-b316-926cebd4972e/drives/b!aUDd-y3hMEqzFpJs69SXLqsFboc6d3VHuXjQmhhH2yyWDIb9eEGSTJmyXz-tN3EO/root:/Dim Driver Event Daily.xlsx:/content"
+
+# Access token
+token_url = f'https://login.microsoftonline.com/a3f88450-77ef-4df3-89ea-c69cbc9bc410/oauth2/v2.0/token'
+token_data = {
+    'grant_type': 'client_credentials',
+    'client_id': 'ad6b066a-d749-4f0b-bfbb-bad8de0af5d1',
+    'client_secret': 'YwZ8Q~N6dAwc~sTcMAQsDQXwCKDfPBk81miLVbL4',
+    'scope': 'https://graph.microsoft.com/.default'
+}
+
+token_r = requests.post(token_url, data=token_data)
+access_token = token_r.json()['access_token']
+
+# Headers
+headers = {
+    'Authorization': 'Bearer ' + access_token,
+    'Content-Type': 'application/x-www-form-urlencoded',
+}
+
+# Đọc dữ liệu file và gửi lên SharePoint
+# Thay đổi, cung  cấp dường dẫn của file đã lưu để mở file
+with open('Dim Driver Event Daily.xlsx', 'rb') as file:
+    file_content = file.read()
+    response = requests.put(update_url, headers=headers, data=file_content)
+
+if response.status_code == 200:
+    print("ghi đè thông tin Dim Driver Event Daily thành công!")
+else:
+    print("Có lỗi xảy ra khi ghi đè thông tin.")
+    
+# ============================================================================================================================================================================
+
+# ============================================================================================================================================================================
+
+# ============================================================================================================================================================================
+#Translate có detect những comments tiếng anh 
+import requests
+import pandas as pd
+import time
+from datetime import datetime
+import html
+from langdetect import detect
+
+result_df = df
+# Định nghĩa hàm sử dụng API của Google Translate
+def make_api_request(url, params=None, headers=None):
+    try:
+        if headers is None:
+            headers = {'Content-Type': 'application/json; charset=utf-8'}
+
+        response = requests.get(url, params=params, headers=headers)
+
+        if response.status_code == 200:
+            translated_text = response.json()['data']['translations'][0]['translatedText']
+            
+            # Chuyển đổi HTML entities về dạng ký tự thường
+            translated_text = html.unescape(translated_text)
+
+            return translated_text
+        else:
+            return f"Error: {response.status_code} - {response.text}"
+
+    except Exception as e:
+        return f"An error occurred: {e}"
+
+# Các bước trước khi dịch
+current_date = datetime.today().strftime('%Y-%m-%d')
+reviews_list = []
+
+# Remove strip and blank rows
+result_df['comments'] = result_df['comments'].apply(lambda x: '\n'.join(sentence.strip() for sentence in x.split('\n') if sentence.strip()))
+# result_df['Review to English'] = result_df['Review to English'].apply(lambda x: '\n'.join(sentence.strip() for sentence in x.split('\n') if sentence.strip()))
+
+# Lấy danh sách các comments theo rideScore cần dịch từ DataFrame
+comment_list = result_df[result_df["rideScore"] != 'NA']["comments"].tolist()
+translated_reviews = []  # List để lưu các bình luận đã dịch
+
+percent = 0
+for index, comment in enumerate(comment_list):
+    
+    try:
+        # Phát hiện ngôn ngữ của bình luận
+        frac_cmt_temp = comment.split('.')
+        frac_cmt = '.'.join(reversed(frac_cmt_temp))
+        language = detect(frac_cmt)
+
+        
+        # Nếu ngôn ngữ là tiếng Anh, giữ nguyên bình luận
+        if language == 'en':
+            translated_reviews.append(comment)
+        else:
+            api_url = "https://translation.googleapis.com/language/translate/v2"
+            api_params = {
+                'key': 'AIzaSyAd5eMHDpUjohF3uHBICaUKhUfiXzQkxNY',
+                'target': 'en',
+                'q': [comment]
+            }
+            translated_comment = make_api_request(api_url, params=api_params)
+            
+            # Lưu bình luận đã dịch vào danh sách
+            translated_reviews.append(translated_comment)
+
+        # Thêm delay sau mỗi 100 requests để tránh vượt quá giới hạn
+        if index % 100 == 0:
+            time.sleep(1)
+        
+        # Hiển thị tiến trình
+        current_percent = round(index / len(comment_list) * 100)
+        if current_percent != percent:
+            print(f"{current_percent}%")
+            percent = current_percent
+
+    except Exception as e:
+        print(f"Error at index {index}: {e}")
+        translated_reviews.append(comment)
+
+# Tạo DataFrame từ danh sách các bình luận đã dịch
+df_translated = pd.DataFrame(translated_reviews, columns=['Review to English'])
+
+# Lọc và chọn các cột cần thiết từ DataFrame gốc
+df_filtered = result_df[result_df['rideScore'] != 'NA'][['Booking ID', 'comments']]
+
+# Nối các DataFrame theo cột (axis=1)
+resultReview = pd.concat([df_filtered.reset_index(drop=True), df_translated], axis=1)
+
+# Gán giá trị ngày hiện tại cho cột 'timeStamp'
+resultReview['timeStamp'] = current_date
+
+# Thay đổi giá trị cho các comments "NA"
+resultReview['Review to English'] = resultReview['Review to English'].replace('THAT', 'NA')
+
+
+# Lưu DataFrame vào file Excel để kiểm tra
+resultReview.to_excel('Review to English.xlsx', index=False)
+
+# ============================================================================================================================================================================
+# Append dữ liệu comments đã dịch cho cột Review to English bảng Dim_reviews sharepoint
+import requests
+import pandas as pd
+append_url = f'https://graph.microsoft.com/v1.0/sites/fbdd4069-e12d-4a30-b316-926cebd4972e/lists/fd860c96-4178-4c92-99b2-5f3fad37710e/items/15/driveitem/workbook/worksheets/Sheet1/tables/Table1/rows/add'
+# Access token
+token_url = f'https://login.microsoftonline.com/a3f88450-77ef-4df3-89ea-c69cbc9bc410/oauth2/v2.0/token'
+token_data = {
+    'grant_type': 'client_credentials',
+    'client_id': 'ad6b066a-d749-4f0b-bfbb-bad8de0af5d1',
+    'client_secret': 'YwZ8Q~N6dAwc~sTcMAQsDQXwCKDfPBk81miLVbL4',
+    'scope': 'https://graph.microsoft.com/.default'
+}
+token_r = requests.post(token_url, data=token_data)
+access_token = token_r.json()['access_token']
+
+# Headers
+headers = {
+    'Authorization': 'Bearer ' + access_token,
+    'Content-Type': 'application/json',
+}
+data = resultReview
+data = data.applymap(lambda x: str(x) if isinstance(x, float) else x)   
+
+#Thay đổi giá trị 'nan'->'NA'
+data['comments'] = data['comments'].replace('nan', 'NA')
+
+data['Review to English'] = data['Review to English'].replace('nan', 'NA')
+
+converted_data = data.values.tolist()
+
+
+value = {"values": converted_data}
+
+response = requests.post(append_url, headers=headers, json=value)
+if response.status_code == 201:
+    print("Apppend thông tin thành công!")       
+else:    
+    print("Có lỗi xảy ra khi Append thông tin.",{response.content})
+    
+# ============================================================================================================================================================================
+
+# ============================================================================================================================================================================
+
+# ============================================================================================================================================================================
+    
+df_preferred = pd.json_normalize(preferred_status['content'])
+
+def map_status(status):
+    if status:
+        return 'On track'
+    else:
+        return 'At risk'
+# Apply the mapping function to the 'preferred' column
+df_preferred['preferred'] = df_preferred['preferred'].map(map_status)
+
+df_preferred = df_preferred[['id', 'name', 'countryCode', 'preferred', 'declineRate.value', 'incidentRate.value', 'driverEventRate.value', 'averageSurveyScore.value']]
+# Reorder cột theo thứ tự mới
+new_order = ['countryCode', 'name', 'preferred', 'incidentRate.value', 'driverEventRate.value', 'declineRate.value', 'averageSurveyScore.value']
+df_preferred = df_preferred[new_order]
+
+# Đổi tên các cột
+new_column_names = {
+    'countryCode': 'Country',
+    'name': 'Location name',
+    'preferred': 'Preferred status',
+    'incidentRate.value': 'Incident rate',
+    'driverEventRate.value': 'Driver events',
+    'declineRate.value': 'Decline rate',
+    'averageSurveyScore.value': 'Avg. score'
+}
+
+# Sử dụng rename để đổi tên các cột
+df_preferred = df_preferred.rename(columns=new_column_names)
+df_preferred.to_excel("preferred.xlsx", index = False)
+
+import requests
+
+# Necessary information
+tenant_id = 'a3f88450-77ef-4df3-89ea-c69cbc9bc410'
+client_id = 'ad6b066a-d749-4f0b-bfbb-bad8de0af5d1'
+client_secret = 'YwZ8Q~N6dAwc~sTcMAQsDQXwCKDfPBk81miLVbL4'  # Replace with the new client secret value
+site_id = 'fbdd4069-e12d-4a30-b316-926cebd4972e'
+drive_id = 'b!aUDd-y3hMEqzFpJs69SXLqsFboc6d3VHuXjQmhhH2yyWDIb9eEGSTJmyXz-tN3EO'
+
+# Endpoint to overwrite the file
+update_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drives/{drive_id}/root:/Prefer Partner by Country.xlsx:/content"
+
+# Get access token
+token_url = f'https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token'
+token_data = {
+    'grant_type': 'client_credentials',
+    'client_id': client_id,
+    'client_secret': client_secret,
+    'scope': 'https://graph.microsoft.com/.default'
+}
+
+try:
+    token_r = requests.post(token_url, data=token_data)
+    token_r.raise_for_status()  # Ensure the request was successful
+    access_token = token_r.json().get('access_token')
+    
+    if not access_token:
+        print("Failed to obtain access token.")
+        exit(1)
+    else:
+        print("Access token obtained successfully.")
+
+    # Headers
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/octet-stream',
+    }
+
+    # Read file data and upload it to SharePoint
+    file_path = 'preferred.xlsx'  # Ensure you provide the correct file path
+
+    try:
+        with open(file_path, 'rb') as file:
+            file_content = file.read()
+            response = requests.put(update_url, headers=headers, data=file_content)
+
+        if response.status_code == 200:
+            print("File successfully overwritten!")
+        else:
+            print(f"An error occurred: {response.status_code} - {response.text}")
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+
+except requests.exceptions.HTTPError as err:
+    print(f"HTTP error occurred: {err}")
+    print("Response content:", token_r.content)
+except Exception as e:
+    print(f"An error occurred: {e}")
