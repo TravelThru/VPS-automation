@@ -176,7 +176,7 @@ def fetch_location_data(pickup_date_from, pickup_date_to):
 start_date = "2024-06-01"
 end_date = "2024-06-31"
 date_from = "2024-06-01T00:00:00"
-date_to = "2024-06-01T23:59:59"
+date_to = "2024-07-31T23:59:59"
 pickup_date_from = "2024-06-09T17:00"
 pickup_date_to = "2024-06-10T16:59"
 
