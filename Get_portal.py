@@ -302,7 +302,6 @@ for booking in bookings:
     
     booking_info = {
         "Booking ID": booking_id,
-        "supplierLocationName":supplierLocationName,
         "rideStatus": rideStatus,
         "incidentStatus": incidentStatus,
         "incidentType": incidentType,
@@ -334,7 +333,9 @@ for booking in bookings:
         "error_departed_to_pickup": error_departed_to_pickup,
         "error_arrived_at_pickup": error_arrived_at_pickup,
         "error_departed_to_dropoff": error_departed_to_dropoff,
-        "error_arrived_at_dropoff": error_arrived_at_dropoff
+        "error_arrived_at_dropoff": error_arrived_at_dropoff,
+        "APILocation" : supplierLocationName
+
     }
     booking_info_list.append(booking_info)
 
