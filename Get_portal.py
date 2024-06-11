@@ -335,7 +335,6 @@ for booking in bookings:
         "error_departed_to_dropoff": error_departed_to_dropoff,
         "error_arrived_at_dropoff": error_arrived_at_dropoff,
         "APILocation" : supplierLocationName
-
     }
     booking_info_list.append(booking_info)
 
@@ -668,15 +667,17 @@ else:
     
 df_preferred = pd.json_normalize(preferred_status['content'])
 
-def map_status(status):
-    if status:
-        return 'On track'
-    else:
-        return 'At risk'
-# Apply the mapping function to the 'preferred' column
-df_preferred['preferred'] = df_preferred['preferred'].map(map_status)
+# Xóa các cột không cần thiết
+columns_to_drop = ["id", "declineRate.maximum", "incidentRate.maximum", "driverEventRate.maximum", "averageSurveyScore.maximum"]
+df_preferred = df_preferred.drop(columns=columns_to_drop, errors='ignore')
 
-df_preferred = df_preferred[['id', 'name', 'countryCode', 'preferred', 'declineRate.value', 'incidentRate.value', 'driverEventRate.value', 'averageSurveyScore.value']]
+# Chuyển giá trị cột 'preferred'
+df_preferred['preferred'] = df_preferred['preferred'].map({False: 'At risk', True: 'On track'})
+
+# Thêm kí tự '%' vào các cột
+percent_columns = ["declineRate.value", "incidentRate.value", "driverEventRate.value"]
+df_preferred[percent_columns] = df_preferred[percent_columns].astype(str) + '%'
+
 # Reorder cột theo thứ tự mới
 new_order = ['countryCode', 'name', 'preferred', 'incidentRate.value', 'driverEventRate.value', 'declineRate.value', 'averageSurveyScore.value']
 df_preferred = df_preferred[new_order]
@@ -694,6 +695,14 @@ new_column_names = {
 
 # Sử dụng rename để đổi tên các cột
 df_preferred = df_preferred.rename(columns=new_column_names)
+
+# Tìm và thay đổi giá trị "PF" đầu tiên trong cột "Country"
+for index, row in df_preferred.iterrows():
+    if row['Country'] == 'PF':
+        df_preferred.at[index, 'Country'] = 'PF1'
+        break  # Chỉ cần thay đổi giá trị đầu tiên, sau đó thoát vòng lặp
+        
+
 df_preferred.to_excel("preferred.xlsx", index = False)
 
 import requests
