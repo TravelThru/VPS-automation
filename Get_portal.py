@@ -318,6 +318,7 @@ for booking in bookings:
         "ridesReview": ridesReview,
         "comments": comments,
         "rideScore": rideScore,
+        "Driver Event": 0,
         "DRIVER_DEPARTED_TO_PICKUP": departed_to_pickup,
         "DRIVER_ARRIVED_AT_PICKUP": arrived_at_pickup,
         "DRIVER_DEPARTED_TO_DROPOFF": departed_to_dropoff,
