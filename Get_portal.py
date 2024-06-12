@@ -99,7 +99,7 @@ def getToken(email, password):
 
 if __name__ == "__main__":
     email = "anhtana3hlk@gmail.com"
-    password = "Tmai091092@@"
+    password = "Tmai@97pqa"
     token = getToken(email, password)
     print(f"Token: {token}")
     
