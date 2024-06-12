@@ -513,7 +513,60 @@ if response.status_code == 200:
     print("ghi đè thông tin Dim Driver Event Daily thành công!")
 else:
     print("Có lỗi xảy ra khi ghi đè thông tin.")
-    
+
+# ============================================================================================================================================================================
+
+# ============================================================================================================================================================================
+
+# ============================================================================================================================================================================
+#Lọc và append dữ liệu cho Dim_Incident
+import requests, uuid
+import pandas as pd
+import time
+from datetime import datetime
+
+current_date = datetime.today().strftime('%Y-%m-%d')
+
+df_filtered = df[df['incidentType'] != 'NA'][['Booking ID', 'incidentType']]
+
+# Gán giá trị ngày hiện tại cho cột 'timeStamp'
+df_filtered['timeStamp'] = current_date
+
+# Lưu DataFrame vào file CSV để kiểm tra
+df_filtered.to_excel('Dim_Incident.xlsx', index=False)
+
+#Append dữ liệu lên Dim_Incident sharepoint
+append_url = f'https://graph.microsoft.com/v1.0/sites/fbdd4069-e12d-4a30-b316-926cebd4972e/lists/fd860c96-4178-4c92-99b2-5f3fad37710e/items/16/driveitem/workbook/worksheets/Sheet1/tables/Table1/rows/add'
+# Access token
+token_url = f'https://login.microsoftonline.com/a3f88450-77ef-4df3-89ea-c69cbc9bc410/oauth2/v2.0/token'
+token_data = {
+    'grant_type': 'client_credentials',
+    'client_id': 'ad6b066a-d749-4f0b-bfbb-bad8de0af5d1',
+    'client_secret': 'YwZ8Q~N6dAwc~sTcMAQsDQXwCKDfPBk81miLVbL4',
+    'scope': 'https://graph.microsoft.com/.default'
+}
+token_r = requests.post(token_url, data=token_data)
+access_token = token_r.json()['access_token']
+
+# Headers
+headers = {
+    'Authorization': 'Bearer ' + access_token,
+    'Content-Type': 'application/json',
+}
+data = pd.read_excel('Dim_Incident.xlsx')
+data = data.applymap(lambda x: str(x) if isinstance(x, float) else x)      
+
+converted_data = data.values.tolist()
+
+
+value = {"values": converted_data}
+
+response = requests.post(append_url, headers=headers, json=value)
+if response.status_code == 201:
+    print("Apppend thông tin thành công!")       
+else:    
+    print("Có lỗi xảy ra khi Append thông tin.",{response.content})
+
 # ============================================================================================================================================================================
 
 # ============================================================================================================================================================================
