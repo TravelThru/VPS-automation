@@ -5,6 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 import psutil
 import time
@@ -56,9 +57,14 @@ def getToken(email, password):
         sign_in_button.click()
         print("Clicked sign-in button")
 
-    def waitForRedirect(driver, url):
-        WebDriverWait(driver, 30).until(EC.url_to_be(url))
-        print(f"Redirected to {url}")
+    def waitForRedirect(driver, url, timeout=60):
+        try:
+            WebDriverWait(driver, timeout).until(EC.url_to_be(url))
+            print(f"Redirected to {url}")
+        except TimeoutException:
+            current_url = driver.current_url
+            print(f"TimeoutException: Expected URL was {url}, but current URL is {current_url}")
+            raise
 
     def captureAuthHeader(driver, timeout=30):
         # Wait for the specific network request and capture the authorization header
@@ -68,7 +74,7 @@ def getToken(email, password):
                 auth_header = request.headers.get('Authorization')
                 if auth_header and auth_header.startswith('Bearer'):
                     print(f"Request URL: {request.url}")
-                    print(f"Authorization header: {auth_header}")
+                    print(f"Authorization header extracted successfully!")
                     return auth_header
             time.sleep(1)
         raise Exception("Authorization header not found within the timeout period")
@@ -78,7 +84,7 @@ def getToken(email, password):
         login(driver, email, password)
 
         # Wait for the page to redirect to the desired URL
-        waitForRedirect(driver, "https://portal.taxi.booking.com/bookings/rides")
+        waitForRedirect(driver, "https://portal.taxi.booking.com/bookings/rides", timeout=60)
 
         # Capture the authorization header
         bearer_token = captureAuthHeader(driver)
