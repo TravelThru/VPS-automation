@@ -179,10 +179,10 @@ def fetch_location_data(pickup_date_from, pickup_date_to):
         return None
 
 # Parameters
-start_date = "2024-08-01"
-end_date = "2024-08-31"
-date_from = "2024-08-01T00:00:00"
-date_to = "2024-09-30T23:59:59"
+start_date = "2024-07-01"
+end_date = "2024-07-31"
+date_from = "2024-07-01T00:00:00"
+date_to = "2024-08-30T23:59:59"
 pickup_date_from = "2024-06-09T17:00"
 pickup_date_to = "2024-06-10T16:59"
 
